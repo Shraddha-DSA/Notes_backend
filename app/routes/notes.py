@@ -4,7 +4,7 @@ from app.database import SessionLocal
 from .. import crud
 from .. import schemas
 from fastapi import HTTPException
-from app.dependencies import get_current_user
+from app.dependencies import get_current_admin, get_current_user
 from app import models
 router=APIRouter()
 def get_db():
@@ -15,12 +15,13 @@ def get_db():
         db.close()
 
 
-@router.post("/notes")
+@router.post("/notes",response_model=schemas.NoteResponse,status_code=201)
 def create_note(
     note: schemas.NoteCreate,
-    db: Session=Depends(get_db)
+    db: Session=Depends(get_db),
+    current_user: models.User=Depends(get_current_user)
 ):
-    return crud.create_note(db,note)
+    return crud.create_note(db=db,note=note,user_id=current_user.id)
 
 
 
@@ -32,7 +33,7 @@ def get_notes(
     db: Session=Depends(get_db),
     current_user: models.User=Depends(get_current_user)
 ):
-    return crud.get_notes(db,skip,limit)
+    return crud.get_notes(db=db,user_id=current_user.id,skip=skip,limit=limit)
 
 
 
@@ -95,6 +96,12 @@ def update_note(
     updated_note=crud.update_note(
         db,note_id,note
     )
+    if note.user_id != get_current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You are not allowed to update this note"
+        )
+
     if updated_note is None:
         raise HTTPException(status_code=404,
                             detail="Note not found")
@@ -108,6 +115,8 @@ def delete_note(
     db: Session=Depends(get_db)
 ):
     note = crud.delete_note(db,note_id)
+    if note.user_id != get_current_user.id:
+        raise HTTPException(status_code=403,detail="You are not allowed to delete this note")
     if note is None:
         raise HTTPException(
             status_code=404,
@@ -117,5 +126,19 @@ def delete_note(
         "message":"Note deleted successfully"
     }
 
-
+@router.delete("/admin/notes/{note_id}")
+def delete_any_note(
+    note_id: int,
+    db: Session=Depends(get_db),
+    admin: models.User = Depends(get_current_admin)
+    
+):
+    note=db.query(models.Note).filter(models.Note.id==note_id).first()
+    if not note:
+        raise HTTPException(status_code=404,
+                            detail="Note not found")
+    db.delete(note)
+    db.commit()
+    return {"message":
+            "Deleted successfully"}
 

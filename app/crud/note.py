@@ -4,12 +4,13 @@ from app import schemas
 from sqlalchemy import or_
 
 
-def create_note(db: Session,note: schemas.NoteCreate):
+def create_note(db: Session,note: schemas.NoteCreate,user_id: int):
     db_note=models.Note(
         title=note.title,
         content=note.content,
         tags=note.tags,
-        category=note.category
+        category=note.category,
+        user_id=user_id
     )
     db.add(db_note)
     db.commit()
@@ -18,11 +19,12 @@ def create_note(db: Session,note: schemas.NoteCreate):
 
 
 def get_notes(db: Session,
+              user_id: int,
               skip: int=0,
               limit: int=10):
     return(
 
-     db.query(models.Note)
+     db.query(models.Note).filter(models.Note.user_id==user_id)
      .offset(skip)
      .limit(limit)
      .all()

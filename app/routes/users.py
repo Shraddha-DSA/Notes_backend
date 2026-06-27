@@ -40,7 +40,8 @@ def login(
         raise HTTPException(status_code=401,
                             detail="Invalid username or password")
     access_token=create_access_token({
-        "sub": db_user.username
+        "sub": db_user.username,
+        "role":db_user.role
     })
     return {
         "access_token":access_token,
